@@ -1,3 +1,5 @@
+#聚类的k-means方法
+
 #每次plt.show()都会暂停 关闭图片继续执行
 
 import matplotlib.pyplot as plt
