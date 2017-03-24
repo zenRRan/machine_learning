@@ -22,12 +22,8 @@ def mu(k):
     sum_x = 1e-15
     sum_y = 1e-15
     for i in range(N):
-        # print("p[i][k] * x[i]", p[i][k], x[i], p[i][k] * x[i])
         sum_x += (p[i][k] * x[i])
         sum_y += (p[i][k] * y[i])
-
-        # sum_x += p[i][k] * x[i]
-        # sum_y += p[i][k] * y[i]
 
     return sum_x/sum, sum_y/sum
 
@@ -41,11 +37,6 @@ def sigma(k):
         sumx += (p[i][k] * math.pow(x[i] - MU_X[k], 2))
         sumy += (p[i][k] * math.pow(y[i] - MU_Y[k], 2))
         cov  += (p[i][k] * (x[i] - MU_X[k]) * (y[i] - MU_Y[k]))
-
-        # sumx += p[i][k] * math.pow(x[i] - MU_X[k], 2)
-        # sumy += p[i][k] * math.pow(y[i] - MU_Y[k], 2)
-        # cov += p[i][k] * (x[i] - MU_X[k]) * (y[i] - MU_Y[k])
-
     return sumx/S, sumy/S, cov/S
 
 
@@ -124,8 +115,6 @@ for i in range(N):
 for step in range(steps):
     # print("#############################################################################################################")
     # print("step: ",step)
-    # print("step ", step, "\np:\n", p)
-    # print("MU :\n", MU_X, "\n", MU_Y, "\nSIGMA:\n", SIGMA)
     draw()
     for k in range(len(x1)):
         PI[k] = pai(k)
