@@ -1,11 +1,12 @@
 import numpy as np
 import random as rand
 import math
+import scipy.stats as stat
+import matplotlib.pyplot as plt
 
 p = []
 X = []
 N = 0
-
 def sum_p(k):
     sum = 1e-15
     for i in range(N):
@@ -15,94 +16,131 @@ def sum_p(k):
 def pai(k):
     return sum_p(k) / N
 
+#return MU_X, MU_Y
 def mu(k):
     sum = sum_p(k)
-    sum_x_p = np.zeros(shape=np.matrix(X[0]).shape)
-    # print(X[0])
-    # print(sum_x_p.shape)
+    sum_x = 1e-15
+    sum_y = 1e-15
     for i in range(N):
-        sum_x_p = np.add(sum_x_p, X[i] * p[i][k])
-        # print("X[i] \n",X[i],"p[i][k] \n",p[i][k],"X[i] * p[i][k] \n",X[i] * p[i][k])
-    return sum_x_p/sum
+        # print("p[i][k] * x[i]", p[i][k], x[i], p[i][k] * x[i])
+        sum_x += (p[i][k] * x[i])
+        sum_y += (p[i][k] * y[i])
 
+        # sum_x += p[i][k] * x[i]
+        # sum_y += p[i][k] * y[i]
+
+    return sum_x/sum, sum_y/sum
+
+#return [x,y,cov]
 def sigma(k):
-    sum = 1.
+    sumx = 1e-15
+    sumy = 1e-15
+    cov  = 1e-15
+    S = sum_p(k)
     for i in range(N):
-        sum += p[i][k]*np.matmul(X[i]-mu(k), (X[i]-mu(k)).transpose())
-    return sum/sum_p(k)
+        sumx += (p[i][k] * math.pow(x[i] - MU_X[k], 2))
+        sumy += (p[i][k] * math.pow(y[i] - MU_Y[k], 2))
+        cov  += (p[i][k] * (x[i] - MU_X[k]) * (y[i] - MU_Y[k]))
 
-def guass(xi, k):
-    # print(k)
-    a = 1/(SIGMA[k]*pow(2*math.pi,0.5))
-    c = np.add(xi,-np.matrix(MU[k]))
-    e = 2*SIGMA[k]*SIGMA[k]
-    g = -1*(np.matmul(c, c.transpose())/e)
-    # print(np.matmul(c, c.transpose())/e)
-    # print(g)
-    f = int(g)
-    b = pow(math.e, f)
+        # sumx += p[i][k] * math.pow(x[i] - MU_X[k], 2)
+        # sumy += p[i][k] * math.pow(y[i] - MU_Y[k], 2)
+        # cov += p[i][k] * (x[i] - MU_X[k]) * (y[i] - MU_Y[k])
 
-    # gua = 1/(SIGMA[k]*pow(2*math.pi,0.5)) * pow(math.e, int(-1*(np.matmul(np.add(xi,-np.matrix(MU[k])), np.add(xi,-np.matrix(MU[k])).transpose())/(2*SIGMA[k]*SIGMA[k]))))
-    return a * b
-def P(i,k):
-    a = PI[k]*guass(X[i],k)
-    b = 0.
+    return sumx/S, sumy/S, cov/S
+
+
+#核心  二维高斯分布求法
+def guass(x, y, k):
+    miux, miuy = MU_X[k], MU_Y[k]
+    [sigmax, sigmay, cov] = SIGMA[k]
+    # print("miux,miuy=", miux, miuy)
+    # print("sigmax,sigmay,cov=", sigmax, sigmay,cov)
+    covmatrix = np.matrix([[sigmax, cov], [cov, sigmay]])
+    cov_inverse = np.linalg.pinv(covmatrix)
+    cov_det = np.linalg.det(cov_inverse)
+    if cov_det < 0:
+        cov_det = 0
+    e1 = 1 / (2 * math.pi) * np.sqrt(np.abs(cov_det))
+    shift = np.matrix([[x - miux], [y - miuy]])
+    er = -0.5 * (np.transpose(shift) * cov_inverse * shift)
+    ex = math.exp(er)
+    # print("guess=",e1 * ex)
+    return e1 * ex
+
+def P(i, k):
+    a = PI[k] * guass(x[i], y[i], k)
+    b = 1e-15
     for kk in range(len(x1)):
-        b +=  PI[k]*guass(X[i],kk)
-    # print("a=",a,"b=",b)
+        b += PI[kk] * guass(x[i], y[i], kk)
+    # print("P[i][k].a,b=", a, b,"  a/b=", a/b)
     return a/b
 
-x1 = [1,2,3,1,2,3]
-x2 = [1,1,1,2,2,3]
-
-num = 5
-meu = 0.2
+x1 = [1, 1, 2]
+x2 = [1, 2, 2]
+num = 100
+meu = 0.1
 rand = rand.Random()
 rand.seed(0)
-steps = 100
-random_x = []
-random_y = []
+steps = 10
+x = []
+y = []
+colorSet = ['blue', 'green', 'red']
 
 for i in range(len(x1)):
-    X.extend(rand.normalvariate(meu, x1[i]) for _ in range(num))
-    X.extend(rand.normalvariate(meu, x2[i]) for _ in range(num))
+    x.extend(rand.normalvariate(x1[i], meu) for _ in range(num))
+    y.extend(rand.normalvariate(x2[i], meu) for _ in range(num))
 
-N = len(X)//2
+N = len(x)
 
-#init para
-MU = X[:len(x1)]
-MU.extend(X[N//2:N//2+len(x1)])
-MU = np.matrix(MU).reshape([len(x1),2])
-X = np.matrix(X).reshape([N,2])
-p = np.zeros([N, len(x1)])
+MU_X = [1.5, 2., 1.5]
+MU_Y = [2. , 1., 1. ]
+
+plt.figure(figsize=(9, 6))
+plt.scatter(x, y, color='black')
+plt.scatter(MU_X, MU_Y, color=colorSet, s=100)
+plt.show()
+
+p = [[0,0,0] for _ in range(len(x))]
+PI = [1.0 / 3.0,1.0 / 3.0,1.0 / 3.0]
+SIGMA = [[0.7,0.7,-0.6] for _ in range(len(x))]
+
+def draw():
+    plt.figure(figsize=(9, 6))
+    colors = []
+    for i in range(len(x)):
+        colors.append(colorSet[p[i].index(max(p[i]))])
+    plt.scatter(MU_X, MU_Y, color=colorSet, s=100, alpha=0.7)
+    plt.scatter(x, y, color=colors)
+    plt.show()
+
 for i in range(N):
-    for j in range(len(x1)):
-        p[i][j] = 1 / len(x1)
-PI = np.zeros(len(x1))
-for i in range(len(x1)):
-    PI[i] = 1/len(x1)
-SIGMA = np.ones([len(x1),1])
-print("p:\n",p)
-print("PI:\n",PI)
-print("MU:\n",MU)
-print("SIGMA:\n",SIGMA)
-
-a = np.matrix([1,2,3,4])
-b = np.matrix([2,3])
-# print([[2,2]]-3)
+    for k in range(len(x1)):
+        p[i][k] = P(i, k)
+# print("PI=\n", PI)
+# print("MU_X, MU_Y=\n",MU_X,MU_Y)
+# print("SIGMA=\n", SIGMA)
+# print("p:\n",p)
 
 for step in range(steps):
-    print("step ",step,"\n",p)
-    print("MU ",MU)
-    for i in range(N):
-        # print("@")
-        # print(p)
-        for k in range(len(x1)):
-            # print("@@")
-            p[i][k] = P(i, k)
+    # print("#############################################################################################################")
+    # print("step: ",step)
+    # print("step ", step, "\np:\n", p)
+    # print("MU :\n", MU_X, "\n", MU_Y, "\nSIGMA:\n", SIGMA)
+    draw()
     for k in range(len(x1)):
-        # print("#")
         PI[k] = pai(k)
-        MU[k] = mu(k)
+    # print("PI=\n", PI)
+    for k in range(len(x1)):
+        MU_X[k], MU_Y[k] = mu(k)
+    # print("MU_X, MU_Y=\n",MU_X,MU_Y)
+    for k in range(len(x1)):
         SIGMA[k] = sigma(k)
+    # print("SIGMA=\n", SIGMA)
+    for i in range(N):
+        for k in range(len(x1)):
+            p[i][k] = P(i, k)
+    # print("p:\n",p)
+    draw()
+
+
 
