@@ -10,10 +10,11 @@ def embeded_sum_pooling(W, data):
     return buffer
 
 tf.flags.DEFINE_string("train_path","/Users/zhenranran/Desktop/train.txt","train path")
+tf.flags.DEFINE_string("dev_path","/Users/zhenranran/Desktop/dev.txt","dev path")
 tf.flags.DEFINE_integer("class_number",3,"class number")
-tf.flags.DEFINE_integer("embeding_size",128,"embeding size")
-tf.flags.DEFINE_float("learning_rate",0.08,"learning rate")
-tf.flags.DEFINE_integer("train_steps",1000,"train steps")
+tf.flags.DEFINE_integer("embeding_size",64,"embeding size")
+tf.flags.DEFINE_float("learning_rate",0.01,"learning rate")
+tf.flags.DEFINE_integer("train_steps",100,"train steps")
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
 
@@ -25,15 +26,17 @@ print("")
 '''load data'''
 print("loading data...")
 x, y, vocabs = data_halper.read_file(FLAGS.train_path)
+dev_x, dev_y , dev_s= data_halper.read_file(FLAGS.dev_path)
 print("done")
-
+print(len(x),len(dev_x))
 '''one-hot'''
 print("\none-hot...")
 max_document_lenth = max([len(text.split()) for text in x])
 print("max_document_lenth=",max_document_lenth)
 vocab_process = learn.preprocessing.VocabularyProcessor(max_document_lenth)
 x = np.array(list(vocab_process.fit_transform(x)))
-# print(x)
+dev_x = np.array(list(vocab_process.fit_transform(dev_x)))
+# print(dev_x)
 print("done")
 
 '''tensorflow'''
@@ -41,9 +44,10 @@ print("done")
 input_x = tf.placeholder(tf.int32, [None, max_document_lenth])
 input_y = tf.placeholder(tf.float32, [None, FLAGS.class_number])
 
-# embedings_W = tf.Variable(tf.random_normal([1000, FLAGS.embeding_size]))
+# embedings_W = tf.Variable(tf.ones([1000, FLAGS.embeding_size]))
+
 embedings_W = tf.Variable(
-    tf.random_normal([1500, FLAGS.embeding_size], -0.1, 0.1,dtype=tf.float32)
+    tf.random_normal([vocabs, FLAGS.embeding_size], -0.1, 0.1,dtype=tf.float32)
 )
 
 #sum embeded data
@@ -52,7 +56,7 @@ input = tf.reduce_sum(
         tf.nn.embedding_lookup(embedings_W, input_x),
         0),
     0)
-input_ = tf.reshape(input, [1, 128])
+input_ = tf.reshape(input, [1, FLAGS.embeding_size])
 
 # W = tf.Variable(tf.random_normal([FLAGS.embeding_size, FLAGS.class_number]))
 W = tf.Variable(
@@ -66,8 +70,8 @@ loss = tf.reduce_mean(
                 labels=input_y, logits=mul
 ) )
 
-train = tf.train.GradientDescentOptimizer(FLAGS.learning_rate).minimize(loss)
-
+# train = tf.train.GradientDescentOptimizer(FLAGS.learning_rate).minimize(loss)
+train = tf.train.AdagradOptimizer(FLAGS.learning_rate).minimize(loss)
 init = tf.global_variables_initializer()
 
 with tf.Session() as sess:
@@ -76,47 +80,39 @@ with tf.Session() as sess:
     print("done\n")
     print("Training...")
 
-    merged = tf.summary.merge_all()
-    writer = tf.summary.FileWriter("/tmp/tensorflowlogs", sess.graph)
-
+    max_acc = 0
     for step in range(FLAGS.train_steps):
         # print("Step:", step)
         # print("------------------------------------------------------------------------------------------------------------")
         error = 0
         i = 0
         for line, y_ in zip(x,y):
-            # if i % 100 == 0:
-            #     print(i)
+            # if i % 10 == 0:
+            #     print("#", end="")
             # i += 1
+            # print("line ",line)
             y_ = np.matrix(y_)
             line = np.matrix(line)
-            # print(sess.run([train, pred, loss, embedings_W, W], feed_dict={input_x: line, input_y: y_}))
+            # print(sess.run([train, embedings_W, input], feed_dict={input_x: line, input_y: y_}))
             sess.run(train, feed_dict={input_x: line, input_y: y_})
         #print("evalution...\n")
         i = 0
+        print("step ",step," train done")
         for line, y_ in zip(x,y):
-            # if i % 100 == 0:
-            #     print(i)
+            # if i % 10 == 0:
+            #     print("@",end="")
             # i += 1
             line = np.matrix(line)
             y_ = np.matrix(y_)
             correct_predictions = tf.equal(tf.argmax(pred, 1), tf.argmax(y_, 1))
+            # print("correct_predictions done")
             accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"))
+            # print("accuracy")
             _, C = sess.run([pred, accuracy], feed_dict={input_x: line, input_y: y_})
             error += C
-        print(step," accuracy: ", error / len(y))
+        ac = error / len(y)
+        if ac > max_acc:
+            max_acc = ac
+            print(step," accuracy: ", ac,"max_acc ", max_acc)
     print("Train is over!")
-
-
-
-
-    # mat_x = np.matrix(x)
-    # mat_y = np.matrix(y)
-    # for step in range(FLAGS.train_steps):
-    #     print("Step:", step)
-    #     print("------------------------------------------------------------------------------------------------------------")
-    #     print(sess.run([train, loss], feed_dict={input_x: mat_x, input_y: mat_y}))
-    #     correct_predictions = tf.equal(pred, tf.argmax(input_y, 1))
-    #     accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"), name="accuracy")
-    #     print("accuracy: ", accuracy)
 
